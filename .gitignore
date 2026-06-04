@@ -1,0 +1,21 @@
+# Secrets — never commit
+.env
+.env.local
+
+# Generated drafts
+drafts/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
