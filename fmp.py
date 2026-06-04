@@ -110,6 +110,40 @@ def _beat_pct(actual, estimate):
     return (actual - estimate) / abs(estimate) * 100.0
 
 
+def _valuation(profile: dict | None, key_metrics: list[dict], income: list[dict]) -> dict:
+    """Correct trailing-twelve-month valuation.
+
+    FMP's quarterly `key-metrics.evToSales` divides enterprise value by a SINGLE
+    quarter's revenue, which overstates the multiple ~4x. We recompute price/sales
+    and EV/sales against summed TTM revenue so the post never cites a 4x-inflated
+    number.
+    """
+    profile = profile or {}
+    km = key_metrics[0] if key_metrics else {}
+
+    ttm_revenue = None
+    if income and len(income) >= 4:
+        revs = [q.get("revenue") for q in income[:4] if q.get("revenue") is not None]
+        if len(revs) == 4:
+            ttm_revenue = sum(revs)
+
+    market_cap = profile.get("marketCap") or km.get("marketCap")
+    enterprise_value = km.get("enterpriseValue")
+
+    ps_ttm = (market_cap / ttm_revenue) if (market_cap and ttm_revenue) else None
+    ev_to_sales_ttm = (
+        enterprise_value / ttm_revenue if (enterprise_value and ttm_revenue) else None
+    )
+
+    return {
+        "market_cap": market_cap,
+        "enterprise_value": enterprise_value,
+        "ttm_revenue": ttm_revenue,
+        "price_to_sales_ttm": ps_ttm,
+        "ev_to_sales_ttm": ev_to_sales_ttm,
+    }
+
+
 def _reported_rows(earnings: list[dict]) -> list[dict]:
     """Earnings rows that have actuals, newest first."""
     rows = [e for e in earnings if e.get("epsActual") is not None]
@@ -188,17 +222,21 @@ def gather(symbol: str, api_key: str, include_transcript: bool = True) -> dict:
         except (FMPError, requests.HTTPError):
             return []
 
+    profile = _safe(get_profile, symbol, api_key) or None
+    key_metrics = _safe(get_key_metrics, symbol, api_key)
+
     return {
         "symbol": symbol,
-        "profile": _safe(get_profile, symbol, api_key) or None,
+        "profile": profile,
         "reported": derived,
+        "valuation": _valuation(profile, key_metrics, income),
         "fiscal": {
             "year": fiscal_year,
             "period": income[0].get("period") if income else None,
         },
         "earnings_series": reported[:8],
         "income_statements": income,
-        "key_metrics": _safe(get_key_metrics, symbol, api_key),
+        "key_metrics": key_metrics,
         "ratios": _safe(get_ratios, symbol, api_key),
         "analyst_estimates": _safe(get_analyst_estimates, symbol, api_key),
         "transcript": transcript,

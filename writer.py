@@ -225,8 +225,7 @@ def build_context(bundle: dict) -> str:
     )
     metrics = _trim_records(
         bundle.get("key_metrics"),
-        ["date", "period", "marketCap", "enterpriseValue", "evToSales",
-         "evToEBITDA", "freeCashFlowYield", "returnOnEquity", "netDebtToEBITDA"],
+        ["date", "period", "freeCashFlowYield", "returnOnEquity", "netDebtToEBITDA"],
         4,
     )
     ratios = _trim_records(
@@ -240,6 +239,22 @@ def build_context(bundle: dict) -> str:
         ["date", "revenueAvg", "epsAvg", "ebitdaAvg", "netIncomeAvg"],
         4,
     )
+
+    val = bundle.get("valuation") or {}
+    if val.get("price_to_sales_ttm") or val.get("ev_to_sales_ttm"):
+        lines.append("")
+        lines.append("=== VALUATION (trailing 12 months — use THESE, not per-quarter ratios) ===")
+        if val.get("market_cap"):
+            lines.append(f"Market cap: {_fmt_money(val['market_cap'])}")
+        if val.get("ttm_revenue"):
+            lines.append(f"TTM revenue: {_fmt_money(val['ttm_revenue'])}")
+        if val.get("price_to_sales_ttm"):
+            lines.append(
+                f"Price/Sales (TTM): {val['price_to_sales_ttm']:.1f}x  "
+                f"(investors pay ${val['price_to_sales_ttm']:.0f} per $1 of annual sales)"
+            )
+        if val.get("ev_to_sales_ttm"):
+            lines.append(f"EV/Sales (TTM): {val['ev_to_sales_ttm']:.1f}x")
 
     if income:
         lines.append("")
